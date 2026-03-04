@@ -3,191 +3,540 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SignalRoot | Cloud Security Engineering</title>
-    <meta name="description" content="SignalRoot — AWS cloud security engineering, threat detection, and security automation by Adewale Odeja.">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>I build detection systems that catch attackers in AWS environments.</title>
+    <meta name="description" content="SignalRoot | SOC-focused Detection Engineer building cloud-native detection rules, automated response pipelines, and IR playbooks for AWS environments.">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
         :root {
-            --bg-primary: #0a0e17;
-            --bg-secondary: #111827;
-            --bg-card: #151d2e;
-            --border: #1e2a3a;
-            --text-primary: #e2e8f0;
-            --text-secondary: #8892a4;
-            --text-muted: #5a6478;
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #111118;
+            --bg-card: #16161f;
+            --bg-card-hover: #1c1c28;
+            --text-primary: #e4e4e7;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
             --accent: #3b82f6;
-            --accent-glow: rgba(59, 130, 246, 0.15);
-            --green: #10b981;
-            --green-glow: rgba(16, 185, 129, 0.1);
-            --font-main: 'Outfit', sans-serif;
+            --accent-dim: rgba(59, 130, 246, 0.15);
+            --accent-green: #10b981;
+            --accent-green-dim: rgba(16, 185, 129, 0.15);
+            --accent-amber: #f59e0b;
+            --accent-amber-dim: rgba(245, 158, 11, 0.15);
+            --accent-red: #ef4444;
+            --accent-red-dim: rgba(239, 68, 68, 0.15);
+            --accent-purple: #8b5cf6;
+            --accent-purple-dim: rgba(139, 92, 246, 0.15);
+            --accent-cyan: #06b6d4;
+            --accent-cyan-dim: rgba(6, 182, 212, 0.15);
+            --border: #27272a;
+            --border-light: #3f3f46;
+            --radius: 12px;
             --font-mono: 'JetBrains Mono', monospace;
+            --font-body: 'Space Grotesk', sans-serif;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html { scroll-behavior: smooth; }
+
         body {
-            background-color: var(--bg-primary);
+            font-family: var(--font-body);
+            background: var(--bg-primary);
             color: var(--text-primary);
-            font-family: var(--font-main);
-            line-height: 1.6;
-            overflow-x: hidden;
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
         }
 
-        .container { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
-        
-        /* Navigation */
-        nav { padding: 40px 0; display: flex; justify-content: space-between; align-items: center; }
-        .logo { font-family: var(--font-mono); font-weight: 700; font-size: 20px; color: var(--text-primary); text-decoration: none; display: flex; align-items: center; gap: 8px; }
-        .logo span { color: var(--accent); }
-        .nav-links { display: flex; gap: 32px; list-style: none; }
-        .nav-links a { text-decoration: none; color: var(--text-secondary); font-size: 14px; font-weight: 500; transition: color 0.2s; }
-        .nav-links a:hover { color: var(--text-primary); }
-
-        /* Hero */
-        .hero { padding: 80px 0 120px; }
-        .hero-label { font-family: var(--font-mono); color: var(--accent); font-size: 14px; margin-bottom: 16px; display: block; }
-        .hero-title { font-size: clamp(40px, 8vw, 72px); font-weight: 700; line-height: 1.1; margin-bottom: 24px; }
-        .hero-desc { max-width: 600px; color: var(--text-secondary); font-size: 18px; margin-bottom: 40px; }
-
-        /* Sections */
-        section { padding: 100px 0; border-top: 1px solid var(--border); }
-        .section-label { font-family: var(--font-mono); color: var(--accent); font-size: 13px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; display: block; }
-        .section-title { font-size: 32px; margin-bottom: 48px; font-weight: 600; }
-
-        /* Projects Grid */
-        .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; }
-        .project-card { 
-            background: var(--bg-card); border: 1px solid var(--border); padding: 32px; border-radius: 12px; transition: transform 0.2s, border-color 0.2s; 
-            display: flex; flex-direction: column; justify-content: space-between; text-decoration: none; color: inherit;
+        /* NAV */
+        nav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            background: rgba(10, 10, 15, 0.85);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            padding: 0 2rem;
         }
-        .project-card:hover { transform: translateY(-4px); border-color: var(--accent); }
-        .project-meta { font-family: var(--font-mono); font-size: 12px; color: var(--accent); margin-bottom: 16px; }
-        .project-name { font-size: 20px; margin-bottom: 12px; font-weight: 600; }
-        .project-desc { color: var(--text-secondary); font-size: 14px; margin-bottom: 24px; }
-        .project-tags { display: flex; flex-wrap: wrap; gap: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+        nav .nav-inner {
+            max-width: 1200px; margin: 0 auto;
+            display: flex; justify-content: space-between; align-items: center;
+            height: 64px;
+        }
+        nav .logo {
+            font-family: var(--font-mono); font-weight: 700; font-size: 1rem;
+            color: var(--accent); text-decoration: none;
+        }
+        nav .nav-links { display: flex; gap: 2rem; }
+        nav .nav-links a {
+            font-size: 0.875rem; color: var(--text-secondary);
+            text-decoration: none; transition: color 0.2s;
+        }
+        nav .nav-links a:hover { color: var(--text-primary); }
 
-        /* Contact Section */
-        .contact-row { display: flex; align-items: center; gap: 16px; margin-top: 32px; flex-wrap: wrap; }
-        .contact-link { color: var(--text-primary); text-decoration: none; font-weight: 600; border-bottom: 1px solid var(--accent); padding-bottom: 2px; transition: color 0.2s; }
-        .contact-link:hover { color: var(--accent); }
-        .contact-divider { color: var(--text-muted); }
+        /* SECTIONS */
+        section { padding: 6rem 2rem; max-width: 1200px; margin: 0 auto; }
 
-        /* Experience Timeline */
-        .timeline { position: relative; max-width: 800px; }
-        .timeline-item { padding-left: 32px; border-left: 1px solid var(--border); position: relative; margin-bottom: 64px; }
-        .timeline-item::after { content: ''; position: absolute; left: -5px; top: 0; width: 9px; height: 9px; background: var(--bg-primary); border: 1px solid var(--accent); border-radius: 50%; }
-        .timeline-date { font-family: var(--font-mono); font-size: 12px; color: var(--accent); margin-bottom: 8px; }
-        .timeline-title { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
-        .timeline-company { font-size: 14px; color: var(--text-secondary); margin-bottom: 16px; }
-        .timeline-desc { font-size: 14px; color: var(--text-secondary); }
+        /* HERO */
+        .hero { padding-top: 10rem; padding-bottom: 4rem; }
+        .hero .badge {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            background: var(--accent-green-dim); color: var(--accent-green);
+            font-size: 0.8rem; font-weight: 500; padding: 0.4rem 1rem;
+            border-radius: 100px; border: 1px solid rgba(16, 185, 129, 0.25);
+            margin-bottom: 2rem;
+        }
+        .hero .badge::before {
+            content: ''; width: 8px; height: 8px; border-radius: 50%;
+            background: var(--accent-green);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
+        .hero h1 {
+            font-size: clamp(2.2rem, 5vw, 3.5rem); font-weight: 700;
+            line-height: 1.15; margin-bottom: 1.5rem; max-width: 800px;
+        }
+        .hero h1 em {
+            font-style: normal; color: var(--accent);
+            background: linear-gradient(135deg, var(--accent), #60a5fa);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .hero .desc {
+            font-size: 1.1rem; color: var(--text-secondary);
+            max-width: 680px; margin-bottom: 1rem; line-height: 1.8;
+        }
+        .hero .targeting {
+            font-size: 0.9rem; color: var(--text-muted);
+            margin-bottom: 2rem; font-style: italic;
+        }
+        .hero .meta {
+            display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center;
+            font-size: 0.9rem; color: var(--text-secondary);
+        }
+        .hero .meta a {
+            color: var(--accent); text-decoration: none;
+            transition: color 0.2s;
+        }
+        .hero .meta a:hover { color: #60a5fa; }
+
+        /* FOCUS PILLS */
+        .focus { padding-top: 2rem; padding-bottom: 4rem; }
+        .focus-label {
+            font-family: var(--font-mono); font-size: 0.75rem;
+            color: var(--text-muted); text-transform: uppercase;
+            letter-spacing: 0.1em; margin-bottom: 1rem;
+        }
+        .focus-grid {
+            display: flex; flex-wrap: wrap; gap: 0.75rem;
+        }
+        .focus-pill {
+            background: var(--bg-card); border: 1px solid var(--border);
+            padding: 0.5rem 1.25rem; border-radius: 100px;
+            font-size: 0.875rem; color: var(--text-secondary);
+        }
+
+        /* CAPABILITIES */
+        .section-label {
+            font-family: var(--font-mono); font-size: 0.75rem;
+            color: var(--text-muted); text-transform: uppercase;
+            letter-spacing: 0.1em; margin-bottom: 0.5rem;
+        }
+        .section-title {
+            font-size: 1.75rem; font-weight: 700; margin-bottom: 3rem;
+        }
+
+        .cap-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+        .cap-card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 2rem;
+            transition: all 0.3s ease;
+        }
+        .cap-card:hover {
+            border-color: var(--border-light);
+            background: var(--bg-card-hover);
+            transform: translateY(-2px);
+        }
+        .cap-icon {
+            font-size: 1.5rem; margin-bottom: 1rem;
+            width: 48px; height: 48px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .cap-card h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.75rem; }
+        .cap-card p { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.7; }
+
+        /* PORTFOLIO */
+        .port-grid { display: grid; gap: 1.5rem; }
+        .port-card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 2rem;
+            text-decoration: none; color: inherit;
+            transition: all 0.3s ease; display: block;
+        }
+        .port-card:hover {
+            border-color: var(--accent);
+            background: var(--bg-card-hover);
+            transform: translateY(-2px);
+        }
+        .port-card.featured { border-color: var(--accent); }
+        .port-badge {
+            display: inline-block; font-size: 0.7rem; font-weight: 600;
+            color: var(--accent); background: var(--accent-dim);
+            padding: 0.2rem 0.75rem; border-radius: 100px;
+            margin-bottom: 0.75rem;
+        }
+        .port-card h3 {
+            font-family: var(--font-mono); font-size: 1rem;
+            font-weight: 600; margin-bottom: 0.75rem;
+        }
+        .port-card p { font-size: 0.875rem; color: var(--text-secondary); line-height: 1.7; margin-bottom: 1rem; }
+        .port-tags { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+        .port-tag {
+            font-family: var(--font-mono); font-size: 0.7rem;
+            color: var(--text-muted); background: var(--bg-primary);
+            padding: 0.25rem 0.75rem; border-radius: 100px;
+            border: 1px solid var(--border);
+        }
+
+        /* DETECTIONS */
+        .det-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem; margin-top: 2rem;
+        }
+        .det-card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 1.75rem;
+            text-decoration: none; color: inherit;
+            transition: all 0.3s ease;
+        }
+        .det-card:hover {
+            border-color: var(--border-light);
+            transform: translateY(-2px);
+        }
+        .det-id {
+            font-family: var(--font-mono); font-size: 0.75rem;
+            color: var(--accent); margin-bottom: 0.25rem;
+        }
+        .det-card h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; }
+        .det-card p { font-size: 0.85rem; color: var(--text-secondary); }
+
+        /* CERTS */
+        .certs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 0.75rem; margin-top: 2rem;
+        }
+        .cert-item {
+            display: flex; align-items: center; gap: 0.75rem;
+            padding: 0.75rem 1.25rem; background: var(--bg-card);
+            border: 1px solid var(--border); border-radius: 8px;
+            font-size: 0.9rem;
+        }
+        .cert-check { color: var(--accent-green); font-weight: 700; }
+
+        /* EXPERIENCE */
+        .exp-timeline { display: grid; gap: 2.5rem; margin-top: 2rem; }
+        .exp-item { padding-left: 1.5rem; border-left: 2px solid var(--border); }
+        .exp-title { font-size: 1.1rem; font-weight: 600; }
+        .exp-company { font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.75rem; }
+        .exp-desc { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.8; }
+        .exp-desc p { margin-bottom: 0.5rem; }
+
+        /* CONTACT */
+        .contact-text {
+            font-size: 1.1rem; color: var(--text-secondary);
+            max-width: 600px; margin-bottom: 2rem; line-height: 1.8;
+        }
+        .contact-links { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+        .contact-links a {
+            color: var(--accent); text-decoration: none;
+            font-size: 0.95rem; transition: color 0.2s;
+        }
+        .contact-links a:hover { color: #60a5fa; }
+
+        /* RESPONSIVE */
         @media (max-width: 768px) {
-            .nav-links { display: none; }
-            .hero { padding: 40px 0 80px; }
+            section { padding: 4rem 1.25rem; }
+            .hero { padding-top: 7rem; }
+            .hero h1 { font-size: 2rem; }
+            nav .nav-links { gap: 1rem; }
+            nav .nav-links a { font-size: 0.8rem; }
+            .cap-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <nav>
-            <a href="#" class="logo">SIGNAL<span>ROOT</span></a>
-            <ul class="nav-links">
-                <li><a href="#projects">Projects</a></li>
-                <li><a href="#experience">Experience</a></li>
-                <li><a href="#contact">Contact</a></li>
-            </ul>
-        </nav>
+<!-- NAV -->
+<nav>
+    <div class="nav-inner">
+        <a href="#" class="logo">signalroot</a>
+        <div class="nav-links">
+            <a href="#capabilities">What I Build</a>
+            <a href="#portfolio">Portfolio</a>
+            <a href="#background">Background</a>
+            <a href="#contact">Contact</a>
+        </div>
+    </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+    <div class="badge">Available for opportunities</div>
+    <h1>I build detection systems that catch attackers in <em>AWS environments</em>.</h1>
+    <p class="desc">
+        SOC-focused Detection Engineer with 8+ years securing a Tier-1 banking platform
+        and hands-on AWS offensive security training (ACRTP-certified, 300+ hours).
+        Combines SOC investigation and incident response experience with cloud-native
+        detection engineering, security automation, and compliance alignment.
+    </p>
+    <p class="targeting">
+        Targeting: SOC Analyst, Detection Engineer, Cloud Security Engineer,
+        and Security Operations roles in Canada.
+    </p>
+    <div class="meta">
+        <span>📍 Toronto, Canada</span>
+        <a href="https://linkedin.com/in/adewaleodeja">LinkedIn</a>
+        <a href="https://github.com/Walentino">GitHub</a>
+        <a href="mailto:adewaleodeja@gmail.com">adewaleodeja@gmail.com</a>
+    </div>
+</section>
+
+<!-- CURRENT FOCUS -->
+<section class="focus">
+    <div class="focus-label">Current Focus</div>
+    <div class="focus-grid">
+        <span class="focus-pill">SOC Investigation & Triage (Splunk, Elastic/Kibana)</span>
+        <span class="focus-pill">AWS Detection Engineering (CloudTrail, EventBridge, Lambda)</span>
+        <span class="focus-pill">Automated Incident Response (Step Functions, SOAR)</span>
+        <span class="focus-pill">Threat Hunting & MITRE ATT&CK Detection Coverage</span>
+        <span class="focus-pill">Sigma Rule Development & Detection Tuning</span>
+        <span class="focus-pill">IAM Privilege Escalation Detection & Auto-Remediation</span>
+        <span class="focus-pill">PCI DSS & CIS AWS Foundations Alignment</span>
+    </div>
+</section>
+
+<!-- CAPABILITIES -->
+<section id="capabilities">
+    <div class="section-label">What I Build</div>
+    <h2 class="section-title">Offensive knowledge, defensive output</h2>
+    <div class="cap-grid">
+        <div class="cap-card">
+            <div class="cap-icon" style="background: var(--accent-cyan-dim);">🔎</div>
+            <h3>SOC Operations & Investigation</h3>
+            <p>Alert triage, investigation methodology, and incident response across cloud and on-premises environments. Hands-on Splunk and Elastic/Kibana for log analysis, threat hunting, and detection tuning. MITRE ATT&CK-mapped investigation workflows with structured case documentation.</p>
+        </div>
+        <div class="cap-card">
+            <div class="cap-icon" style="background: var(--accent-dim);">🔍</div>
+            <h3>Threat Detection</h3>
+            <p>CloudTrail-based detection rules and a live automated pipeline that catches IAM credential compromise in under 60 seconds. 25+ production rules mapped to MITRE ATT&CK for Cloud. Sigma rules for cross-platform detection coverage.</p>
+        </div>
+        <div class="cap-card">
+            <div class="cap-icon" style="background: var(--accent-green-dim);">⚙️</div>
+            <h3>Security Automation</h3>
+            <p>Terraform modules, Python (Boto3) auto-remediation, and Step Functions incident response orchestration with human-in-the-loop approval gates across AWS accounts. Splunk SOAR integration for automated triage workflows.</p>
+        </div>
+        <div class="cap-card">
+            <div class="cap-icon" style="background: var(--accent-amber-dim);">🛡️</div>
+            <h3>Cloud Security Posture</h3>
+            <p>Assessment and hardening using Prowler, ScoutSuite, AWS Security Hub, GuardDuty, and Config Rules. CIS Benchmarks and compliance framework alignment.</p>
+        </div>
+        <div class="cap-card">
+            <div class="cap-icon" style="background: var(--accent-red-dim);">🔴</div>
+            <h3>Offensive-Informed Defense</h3>
+            <p>ACRTP-certified. I exploit the same IAM misconfigurations, trust policy flaws, and Lambda execution gaps that real attackers use, then build detections for them.</p>
+        </div>
+    </div>
+</section>
+
+<!-- PORTFOLIO -->
+<section id="portfolio">
+    <div class="section-label">Portfolio</div>
+    <h2 class="section-title">Open-source security tooling</h2>
+    <p style="color: var(--text-secondary); margin-bottom: 2rem; font-size: 0.95rem;">
+        Repositories covering the full security lifecycle: prevent, detect, investigate, and respond.
+    </p>
+    <div class="port-grid">
+        <!-- AWS Detection Response Pipeline -->
+        <a href="https://github.com/Walentino/aws-detection-response-pipeline" class="port-card featured">
+            <span class="port-badge">Featured</span>
+            <h3>aws-detection-response-pipeline</h3>
+            <p>
+                Serverless detection and response pipeline that catches IAM access key compromise in under 60 seconds.
+                CloudTrail to EventBridge to Lambda for real-time threat detection with three signals mapped to MITRE ATT&CK.
+                Step Functions orchestrates the full incident lifecycle: automated containment, analyst approval gate,
+                permanent remediation or rollback. $0/month within AWS Free Tier.
+            </p>
+            <div class="port-tags">
+                <span class="port-tag">CloudTrail</span>
+                <span class="port-tag">EventBridge</span>
+                <span class="port-tag">Lambda</span>
+                <span class="port-tag">Step Functions</span>
+                <span class="port-tag">DynamoDB</span>
+                <span class="port-tag">SNS</span>
+                <span class="port-tag">Python</span>
+                <span class="port-tag">Terraform</span>
+                <span class="port-tag">Detection Engineering</span>
+            </div>
+        </a>
+
+        <!-- CloudTrail Detection Rules -->
+        <a href="https://github.com/Walentino/aws-cloudtrail-detection-rules" class="port-card">
+            <h3>aws-cloudtrail-detection-rules</h3>
+            <p>
+                25+ production-ready detection rules targeting the attack patterns behind the majority of AWS breaches.
+                Covers credential theft, privilege escalation, data exfiltration, and defense evasion.
+                Mapped to MITRE ATT&CK for Cloud. Deployable via Terraform.
+            </p>
+            <div class="port-tags">
+                <span class="port-tag">CloudTrail</span>
+                <span class="port-tag">MITRE ATT&CK</span>
+                <span class="port-tag">Terraform</span>
+                <span class="port-tag">Detection-as-Code</span>
+                <span class="port-tag">PCI DSS</span>
+            </div>
+        </a>
+
+        <!-- Terraform Security Modules -->
+        <a href="https://github.com/Walentino/terraform-aws-security-modules" class="port-card">
+            <h3>terraform-aws-security-modules</h3>
+            <p>
+                6 reusable IaC modules preventing the misconfigurations most commonly exploited in cloud breaches.
+                Enforces CIS AWS Foundations controls by default. Catches issues at terraform plan before production.
+            </p>
+            <div class="port-tags">
+                <span class="port-tag">Terraform</span>
+                <span class="port-tag">CIS Benchmark</span>
+                <span class="port-tag">IaC Security</span>
+                <span class="port-tag">AWS</span>
+            </div>
+        </a>
+
+        <!-- SOC Investigation Portfolio (NEW - Post MyDFIR) -->
+        <a href="https://github.com/Walentino" class="port-card">
+            <span class="port-badge" style="background: var(--accent-green-dim); color: var(--accent-green);">SOC Portfolio</span>
+            <h3>SOC Investigation & Detection Lab</h3>
+            <p>
+                End-to-end SOC lab built on cloud infrastructure: Splunk SIEM with custom dashboards and alerts,
+                Elastic/Kibana for log analysis, Sigma detection rules mapped to MITRE ATT&CK,
+                osTicket for incident management, and Mythic C2 for attack simulation.
+                Includes investigation case studies for phishing, brute force, identity compromise,
+                and endpoint intrusion scenarios with full documentation.
+            </p>
+            <div class="port-tags">
+                <span class="port-tag">Splunk</span>
+                <span class="port-tag">Elastic</span>
+                <span class="port-tag">Sigma Rules</span>
+                <span class="port-tag">Zeek</span>
+                <span class="port-tag">Suricata</span>
+                <span class="port-tag">MITRE ATT&CK</span>
+                <span class="port-tag">Wireshark</span>
+                <span class="port-tag">Yara</span>
+                <span class="port-tag">osTicket</span>
+            </div>
+        </a>
     </div>
 
-    <main>
-        <div class="container">
-            <section class="hero" style="border-top: none;">
-                <span class="hero-label">Adewale Odeja // Security Engineer</span>
-                <h1 class="hero-title">Protecting cloud<br>infrastructure through <span style="color: var(--accent)">automation.</span></h1>
-                <p class="hero-desc">
-                    Specializing in AWS security, serverless detection engineering, and purple team operations. 
-                    Building systems that detect and remediate threats in seconds, not hours.
-                </p>
-                <a href="#contact" class="contact-link" style="font-size: 16px;">Let's work together</a>
-            </section>
+    <!-- Featured Detections -->
+    <div style="margin-top: 4rem;">
+        <div class="section-label">Featured Detections</div>
+        <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.95rem;">Detection capabilities from the portfolio, each linked to source code.</p>
+        <div class="det-grid">
+            <a href="https://github.com/Walentino/aws-detection-response-pipeline" class="det-card">
+                <div class="det-id">PIPELINE-001</div>
+                <h4>Live Automated Response</h4>
+                <p>Real-time CreateAccessKey detection with automated containment. Disables key, quarantines user, then orchestrates analyst approval via Step Functions before permanent remediation.</p>
+            </a>
+            <a href="https://github.com/Walentino/aws-cloudtrail-detection-rules" class="det-card">
+                <div class="det-id">LOG-001</div>
+                <h4>CloudTrail Tamper Detection</h4>
+                <p>Catches StopLogging, DeleteTrail, and PutEventSelectors events that attackers use to blind defensive monitoring.</p>
+            </a>
+            <a href="https://github.com/Walentino/aws-cloudtrail-detection-rules" class="det-card">
+                <div class="det-id">EXFIL-001</div>
+                <h4>S3 Data Exposure Detection</h4>
+                <p>Identifies PutBucketPolicy, PutBucketAcl, and GetObject anomalies indicating unauthorized S3 data access or public exposure.</p>
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- CERTIFICATIONS -->
+<section>
+    <div class="section-label">Credentials</div>
+    <h2 class="section-title">Certifications</h2>
+    <div class="certs-grid">
+        <div class="cert-item"><span class="cert-check">✓</span> Amazon Certified Red Team Professional (ACRTP)</div>
+        <div class="cert-item"><span class="cert-check">✓</span> AWS Certified Security – Specialty</div>
+        <div class="cert-item"><span class="cert-check">✓</span> AWS Certified Solutions Architect – Professional</div>
+        <div class="cert-item"><span class="cert-check">✓</span> AWS Certified DevOps Engineer – Professional</div>
+        <div class="cert-item"><span class="cert-check">✓</span> Certified Kubernetes Administrator (CKA)</div>
+        <div class="cert-item"><span class="cert-check">✓</span> HashiCorp Terraform Associate</div>
+    </div>
+</section>
+
+<!-- EXPERIENCE -->
+<section id="background">
+    <div class="section-label">Background</div>
+    <h2 class="section-title">Experience</h2>
+    <div class="exp-timeline">
+        <!-- SignalRoot -->
+        <div class="exp-item">
+            <div class="exp-title">Security Detection Engineer</div>
+            <div class="exp-company">SignalRoot · Toronto, Canada · 2023 – Present</div>
+            <div class="exp-desc">
+                <p>Building AWS threat detection and security automation tooling. Completed ACRTP (300+ hours of AWS attack simulation), then translated offensive techniques into production detection rules. Built an end-to-end automated detection and response pipeline with Step Functions incident orchestration. Scored 9/9 on Pwned Labs Electra cyber range.</p>
+                <p>Completed MyDFIR SOC Analyst Course: 30+ hands-on investigation labs covering email analysis, identity compromise, Active Directory attacks, network analysis (Zeek, Suricata, Wireshark), malware analysis (static, dynamic, Yara), and endpoint forensics. Built Splunk dashboards, Sigma detection rules, and investigation playbooks. Completed 5 SOC projects including CTI integration, detection lab, and Splunk SOAR integration.</p>
+                <p>Leads the GTA Pwned Labs study group (8-12 practitioners, weekly hands-on labs).</p>
+            </div>
         </div>
 
-        <section id="projects">
-            <div class="container">
-                <span class="section-label">Portfolio</span>
-                <h2 class="section-title">Selected Projects</h2>
-                <div class="project-grid">
-                    <div class="project-card">
-                        <div>
-                            <div class="project-meta">AWS / Python / Terraform</div>
-                            <div class="project-name">Automated Detection & Response Pipeline</div>
-                            <p class="project-desc">A real-time security pipeline that detects exposed IAM keys via CloudTrail and automatically revokes access in < 10 seconds.</p>
-                        </div>
-                        <div class="project-tags">#CloudTrail #EventBridge #Lambda #SecurityAutomation</div>
-                    </div>
-
-                    <div class="project-card">
-                        <div>
-                            <div class="project-meta">Security Assessment</div>
-                            <div class="project-name">AWS IAM Least-Privilege Audit</div>
-                            <p class="project-desc">Systematic analysis of IAM roles and policies to identify privilege escalation paths and over-privileged service accounts.</p>
-                        </div>
-                        <div class="project-tags">#IAM #Audit #Compliance</div>
-                    </div>
-                </div>
+        <!-- Career Development -->
+        <div class="exp-item">
+            <div class="exp-title">Cloud Security Training & Certification</div>
+            <div class="exp-company">Independent Study · Toronto, Canada · 2019 – 2023</div>
+            <div class="exp-desc">
+                <p>Completed ACRTP certification (300+ hours of hands-on AWS attack simulation) covering IAM exploitation, Lambda abuse, and cross-account attacks, building offensive foundation for detection engineering.</p>
+                <p>Earned AWS Security Specialty, Solutions Architect Professional, and DevOps Professional certifications, establishing deep cloud security expertise.</p>
+                <p>Founded GTA Pwned Labs study group (8-12 practitioners) facilitating weekly cloud security labs and detection engineering workshops.</p>
             </div>
-        </section>
-
-        <section id="experience">
-            <div class="container">
-                <span class="section-label">Resume</span>
-                <h2 class="section-title">Experience</h2>
-                <div class="timeline">
-                    <div class="timeline-item">
-                        <div class="timeline-date">2026 — PRESENT</div>
-                        <div class="timeline-title">Cloud Security Specialization</div>
-                        <div class="timeline-company">Purple Team Focus</div>
-                        <p class="timeline-desc">
-                            Hands-on implementation of AWS security architectures, including automated remediation pipelines, GuardDuty orchestration, and custom detection rules.
-                        </p>
-                    </div>
-                    <div class="timeline-item">
-                        <div class="timeline-date">2011 — 2019</div>
-                        <div class="timeline-title">Head, E-Business Regional Support</div>
-                        <div class="timeline-company">First Bank of Nigeria</div>
-                        <p class="timeline-desc">
-                            Managed security operations and audit compliance for major banking platforms. Led teams through PCI DSS and ISO 27001 certifications.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section id="contact">
-            <div class="container">
-                <span class="section-label">Contact</span>
-                <h2 class="section-title">Get in touch</h2>
-                <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 15px;">
-                    Currently open to opportunities in Cloud Security Engineering and Detection Engineering.
-                </p>
-                <div class="contact-row">
-                    <a href="mailto:adewaleodeja@gmail.com" class="contact-link">adewaleodeja@gmail.com</a>
-                    <span class="contact-divider">/</span>
-                    <a href="https://linkedin.com/in/walentino" target="_blank" class="contact-link">LinkedIn</a>
-                    <span class="contact-divider">/</span>
-                    <a href="https://github.com/Walentino" target="_blank" class="contact-link">GitHub</a>
-                </div>
-            </div>
-        </section>
-    </main>
-
-    <footer style="padding: 40px 0; text-align: center; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);">
-        <div class="container">
-            &copy; 2026 SIGNALROOT — BUILDING RESILIENT CLOUD DEFENSES
         </div>
-    </footer>
+
+        <!-- First Bank -->
+        <div class="exp-item">
+            <div class="exp-title">Head, E-Business Regional Support → Security Operations Lead</div>
+            <div class="exp-company">First Bank of Nigeria · Lagos · 2011 – 2019</div>
+            <div class="exp-desc">
+                <p>Led security operations for a Tier-1 digital banking platform serving millions of customers and processing 10M+ transactions/day.</p>
+                <p>Achieved 90% reduction in audit findings over 8 years across PCI DSS Level 1 and ISO 27001 controls.</p>
+                <p>Triaged and coordinated response to security incidents including fraud alerts, system intrusions, and anomalous access attempts.</p>
+                <p>Designed log collection strategy, threshold-based alerting, and escalation workflows for the banking platform.</p>
+                <p>Closed 200+ high/critical findings annually partnering with infrastructure and development teams.</p>
+                <p>Maintained 99.9% platform uptime.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CONTACT -->
+<section id="contact">
+    <div class="section-label">Get in touch</div>
+    <h2 class="section-title">Let's connect</h2>
+    <p class="contact-text">
+        Looking to bring SOC investigation expertise and offensive-informed detection
+        engineering to a team protecting cloud and enterprise infrastructure at scale.
+    </p>
+    <div class="contact-links">
+        <a href="mailto:adewaleodeja@gmail.com">adewaleodeja@gmail.com</a>
+        <a href="https://linkedin.com/in/adewaleodeja">LinkedIn</a>
+    </div>
+</section>
+
+<div style="padding: 2rem; text-align: center; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem;">
+    SignalRoot · Adewale Odeja · Toronto, Canada
+</div>
 
 </body>
 </html>
