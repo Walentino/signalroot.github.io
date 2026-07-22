@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adewale Odeja — Security Operations Portfolio</title>
+<meta name="description" content="Hands-on Microsoft 365 incident investigations: AiTM, BEC, token-replay controls, and OAuth consent abuse. SC-200 certified.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+<header class="sitehead">
+  <p class="eyebrow">Security Operations Portfolio</p>
+  <h1>Adewale Odeja</h1>
+  <p class="sub">SOC Analyst (Tier 1/2) &middot; Microsoft Sentinel &amp; Defender &middot; SC-200 Certified</p>
+  <p class="lede">Four hands-on incident investigations, each run end to end in a Microsoft 365 E5 lab I built. I generated controlled attack telemetry, then worked each case through triage, correlation, containment, eradication, and a written report, limitations included. These are lab exercises, not production incidents, and each report says so plainly.</p>
+  <p class="meta-inline">Microsoft Sentinel &middot; Defender XDR &middot; KQL advanced hunting &middot; Entra ID &middot; MITRE ATT&amp;CK</p>
+</header>
+
+<p class="section-label">Case files</p>
+<ul class="cases">
+<li><a class="case" href="aitm-signin-compromise.html">
+  <div class="case-top">
+    <span class="case-id">INC-ICS-2026-0716-001</span>
+    <span class="chip incident">Incident</span>
+  </div>
+  <h3>Adversary-in-the-Middle Sign-In Compromise</h3>
+  <p>Anomalous authenticated access from anonymised Tor infrastructure across four countries, with a mail-hiding inbox rule and mailbox reads. Correlated across SigninLogs and OfficeActivity; contained via session revocation.</p>
+  <div class="case-tags"><span class="tag">T1557 AiTM</span><span class="tag">T1078.004</span><span class="tag">T1114.003</span><span class="case-date">16 Jul 2026</span></div>
+</a></li><li><a class="case" href="bec-payment-diversion.html">
+  <div class="case-top">
+    <span class="case-id">INC-ICS-2026-0718-002</span>
+    <span class="chip incident">Incident</span>
+  </div>
+  <h3>Business Email Compromise (Payment Diversion)</h3>
+  <p>Payment-diversion fraud detected on behaviour alone, with no infrastructure signal. Keyword inbox rule, fraudulent send, and evidence deletion correlated within six minutes; evidence preserved before eradication.</p>
+  <div class="case-tags"><span class="tag">T1114</span><span class="tag">T1534</span><span class="tag">T1564.008</span><span class="case-date">18 Jul 2026</span></div>
+</a></li><li><a class="case" href="token-control-assessment.html">
+  <div class="case-top">
+    <span class="case-id">TSA-ICS-2026-0721-003</span>
+    <span class="chip assessment">Assessment</span>
+  </div>
+  <h3>Token-Replay Control Assessment</h3>
+  <p>Assessed CAE and Conditional Access token protection against tenant state. Identified a missing Conditional Access baseline as the root gap and re-prioritised control recommendations, deployable first.</p>
+  <div class="case-tags"><span class="tag">CAE</span><span class="tag">Token protection</span><span class="tag">Conditional Access</span><span class="case-date">21 Jul 2026</span></div>
+</a></li><li><a class="case" href="oauth-consent-grant.html">
+  <div class="case-top">
+    <span class="case-id">INC-ICS-2026-0721-004</span>
+    <span class="chip incident">Incident</span>
+  </div>
+  <h3>Illicit OAuth Consent Grant</h3>
+  <p>Consent-phishing grant investigated through AuditLogs. Identified tenant-wide (AllPrincipals) blast radius across three consent audit operations; eradicated the grant and removed the service principal.</p>
+  <div class="case-tags"><span class="tag">T1550.001</span><span class="tag">T1098.003</span><span class="tag">OAuth</span><span class="case-date">21 Jul 2026</span></div>
+</a></li>
+</ul>
+
+<p class="note"><strong>About these reports.</strong> Every investigation was performed against self-generated telemetry in a single-tenant lab. Each report scopes findings to what the evidence supports and documents what the lab could not reproduce. The intent is to show investigation method and honest reasoning, not to claim production experience.</p>
+
+<footer class="sitefoot">Adewale Odeja &middot; Greater Toronto Area &middot; <a href="https://www.linkedin.com/in/adewaleodeja/">linkedin.com/in/adewaleodeja</a></footer>
+</div>
+</body>
+</html>

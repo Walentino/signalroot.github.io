@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Business Email Compromise (Payment Diversion) — Adewale Odeja</title>
+<meta name="description" content="Payment-diversion fraud detected on behaviour alone, with no infrastructure signal. Keyword inbox rule, fraudulent send, and evidence deletion correla">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+<nav class="report-nav"><a href="index.html">&larr; All case files</a></nav>
+<article class="report">
+<h1
+id="incident-investigation-report-business-email-compromise-simulation">Incident
+Investigation Report, Business Email Compromise Simulation</h1>
+<p><strong>Incident ID:</strong> INC-ICS-2026-0718-002 <strong>Related
+incident:</strong> INC-ICS-2026-0716-001 (AiTM credential phishing).
+This incident is the continuation. AiTM was the entry, BEC is the
+objective. <strong>Classification:</strong> Controlled
+detection-validation exercise (lab, self-generated telemetry, not a real
+breach) <strong>Attack type:</strong> Business Email Compromise, FBI
+Type 3 (account compromise) with Type 1 characteristics (vendor invoice
+fraud / payment diversion) <strong>Environment:</strong>
+iCustomerSolutions M365 E5 tenant, Microsoft Sentinel workspace
+<code>law-sentinel-lab</code>, Defender XDR unified portal
+<strong>Compromised mailbox:</strong>
+<code>dave@iCustomerSolutions.onmicrosoft.com</code> <strong>Fraud
+target:</strong> <code>alice@iCustomerSolutions.onmicrosoft.com</code>
+<strong>Investigation date:</strong> 18 July 2026
+<strong>Status:</strong> Closed. Evidence preserved, contained,
+eradicated. <strong>Times:</strong> UTC throughout (source events
+captured in ET, ET + 4h)</p>
+<hr />
+<h2 id="1-executive-summary">1. Executive Summary</h2>
+<p>On 18 July 2026, a controlled business email compromise exercise was
+performed against the mailbox compromised in INC-ICS-2026-0716-001,
+continuing the same simulated actor's activity. From an authenticated
+session the actor created a mail interception rule targeting the
+keywords "invoice" and "payment" and routing matches to Deleted Items,
+then sent a payment diversion email to an internal recipient requesting
+that banking details be changed on a $47,000 invoice, then deleted the
+sent item to suppress evidence. The full sequence took six minutes.
+Unlike the preceding AiTM incident, no infrastructure indicator was
+present: every action originated from the user's own residential IP
+address on a normal browser in a legitimately authenticated session, so
+no anomalous sign-in, no anonymised source, and no malicious content
+existed to detect. Evidence was preserved, the recipient was notified
+out of band, the interception rule and fraudulent message were removed,
+and sessions were revoked, all within 49 minutes of the fraudulent send.
+No payment was initiated and no financial loss occurred. The exercise
+validated behavioural BEC detection logic and demonstrated why
+infrastructure based detection fails against this attack class.
+Hardening recommendations are in Section 7.</p>
+<hr />
+<h2 id="2-timeline">2. Timeline</h2>
+<p>All times 18 July 2026. Footprint timestamps are taken from audit
+records and are authoritative. Response timestamps are analyst recorded
+to the minute.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Time (UTC)</th>
+<th>Stage</th>
+<th>Event</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>13:36:57</td>
+<td>Persistence (Stage 3)</td>
+<td>Inbox rule "SS Sync" created.
+<code>SubjectOrBodyContainsWords: invoice</code>,
+<code>SubjectContainsWords: payment</code>,
+<code>MoveToFolder: Deleted Items</code>,
+<code>StopProcessingRules: True</code></td>
+<td>OfficeActivity, <code>New-InboxRule</code></td>
+</tr>
+<tr class="even">
+<td>13:41:50</td>
+<td>Fraud execution (Stage 4)</td>
+<td>Payment diversion email sent to <code>alice</code>, subject "Updated
+banking details, Invoice INV-4417", requesting change of banking details
+on a $47,000 invoice</td>
+<td>OfficeActivity, <code>Send</code></td>
+</tr>
+<tr class="odd">
+<td>13:43:08</td>
+<td>Evidence destruction (Stage 6)</td>
+<td>Sent item moved to Deleted Items</td>
+<td>OfficeActivity, <code>MoveToDeletedItems</code></td>
+</tr>
+<tr class="even">
+<td>13:43:15</td>
+<td>Evidence destruction (Stage 6)</td>
+<td>Deleted Items emptied, item moved to Recoverable Items</td>
+<td>OfficeActivity, <code>SoftDelete</code></td>
+</tr>
+<tr class="odd">
+<td>14:25</td>
+<td>Response</td>
+<td>Fraud target <code>alice</code> notified out of band (voice, not
+email, as the mailbox was potentially monitored)</td>
+<td>Analyst record</td>
+</tr>
+<tr class="even">
+<td>14:26</td>
+<td>Response</td>
+<td>Inbox rule "SS Sync" removed, Rules list verified empty</td>
+<td>Analyst record</td>
+</tr>
+<tr class="odd">
+<td>14:27</td>
+<td>Response</td>
+<td>Fraudulent email removed from <code>alice</code> mailbox</td>
+<td>Analyst record</td>
+</tr>
+<tr class="even">
+<td>14:30</td>
+<td>Response</td>
+<td>All refresh tokens and sessions revoked for <code>dave</code></td>
+<td>Analyst record</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Elapsed:</strong> 6 minutes 18 seconds from persistence to
+evidence destruction. 49 minutes from fraudulent send to full
+eradication.</p>
+<hr />
+<h2 id="3-scope">3. Scope</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Attribute</th>
+<th>Finding</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Compromised mailboxes</td>
+<td>1 (<code>dave</code>), carried over from INC-ICS-2026-0716-001</td>
+</tr>
+<tr class="even">
+<td>Fraud recipients</td>
+<td>1 (<code>alice</code>, internal)</td>
+</tr>
+<tr class="odd">
+<td>Fraudulent emails sent</td>
+<td>1</td>
+</tr>
+<tr class="even">
+<td>Persistence mechanisms</td>
+<td>1, inbox rule "SS Sync"</td>
+</tr>
+<tr class="odd">
+<td>Payment initiated</td>
+<td>None</td>
+</tr>
+<tr class="even">
+<td>Financial loss</td>
+<td>$0</td>
+</tr>
+<tr class="odd">
+<td>External recipients</td>
+<td>None. All activity internal to the tenant</td>
+</tr>
+<tr class="even">
+<td>Evidence destruction</td>
+<td>1 item, soft deleted, recoverable</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Recoverability note.</strong> The user interface action was
+"permanently delete", but the audit layer recorded
+<code>SoftDelete</code>, meaning the item moved to Recoverable Items
+rather than being purged. A <code>HardDelete</code> would indicate purge
+from Recoverable Items. The distinction is operationally important: soft
+deleted evidence remains retrievable by an administrator, so the
+fraudulent message could have been recovered for a bank recall or law
+enforcement referral even after the actor believed it was destroyed.</p>
+<hr />
+<h2 id="4-investigation-method">4. Investigation Method</h2>
+<p>The correlation basis for this incident differs fundamentally from
+INC-ICS-2026-0716-001 and is the central finding of the exercise.</p>
+<p><strong>No infrastructure signal existed.</strong> Every event, the
+rule creation, the send, and both deletions, originated from
+<code>142.198.143.161</code>, the user's established residential IP
+address in Ontario, on <code>Client=OWA</code> with an ordinary Mac
+Chrome user agent. This matches the user's normal baseline exactly.
+There was no risky sign-in, no anonymised source, no proxy indicator,
+and no Conditional Access anomaly. The IP pivot technique used in the
+preceding AiTM investigation would not have surfaced any of this
+activity.</p>
+<p><strong>Correlation was therefore behavioural and
+sequential.</strong> Three individually unremarkable events form a fraud
+pattern when read in order and in proximity:</p>
+<ol type="1">
+<li>Creation of a rule that intercepts financial keywords and hides
+matches, which is not typical end user behaviour.</li>
+<li>A send containing financial change vocabulary in the subject
+line.</li>
+<li>Deletion of that sent item minutes later.</li>
+</ol>
+<p>No single event warrants an alert. The sequence, compressed into six
+minutes, does. This is the detection principle for BEC: the signal is in
+the pattern and its timing, not in any indicator of compromise.</p>
+<p><strong>Queries used:</strong> <code>OfficeActivity</code> filtered
+on <code>New-InboxRule</code> / <code>Set-InboxRule</code> /
+<code>UpdateInboxRules</code>, on <code>Send</code>, and on
+<code>HardDelete</code> / <code>SoftDelete</code> /
+<code>MoveToDeletedItems</code>, each scoped to the affected mailbox.
+Rule intent was established by reading the <code>Parameters</code>
+field, which recorded the keyword conditions and destination folder in
+full.</p>
+<hr />
+<h2 id="5-containment-evidence-preservation-and-eradication">5.
+Containment, Evidence Preservation, and Eradication</h2>
+<p>BEC response sequencing differs from AiTM response. Evidence is
+preserved before eradication, because mailbox artefacts and audit
+records may be required for bank recall or law enforcement referral.
+Removing the interception rule or the fraudulent message first can
+destroy proof that the fraud occurred.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Order</th>
+<th>Action</th>
+<th>Time (UTC)</th>
+<th>Verification</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td><strong>Preserve.</strong> Audit evidence captured and exported:
+full rule parameters, message subject, InternetMessageId, recipient, and
+both deletion events</td>
+<td>Prior to 14:25</td>
+<td>Query result sets retained as the evidence package</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td><strong>Notify.</strong> Fraud target contacted out of band by
+voice, not email, so the potentially monitored mailbox was not used</td>
+<td>14:25</td>
+<td>Recipient confirmed no payment action taken</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td><strong>Eradicate persistence.</strong> Inbox rule "SS Sync"
+removed</td>
+<td>14:26</td>
+<td>Rules list re-checked, empty</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td><strong>Remove fraudulent message.</strong> Email deleted from
+recipient mailbox</td>
+<td>14:27</td>
+<td>Message no longer present. In production this would be executed
+centrally via Defender email purge rather than per mailbox</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td><strong>Contain identity.</strong> All refresh tokens and sessions
+revoked for <code>dave</code></td>
+<td>14:30</td>
+<td>Session revocation completed</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rationale for session revocation.</strong> Unlike the
+preceding AiTM incident, where a stolen token was the live threat, the
+BEC activity here originated from a legitimately authenticated session.
+Revocation was performed anyway because the root cause is the unresolved
+identity compromise from INC-ICS-2026-0716-001, and session integrity
+could not be assumed. Where the underlying compromise is uncertain,
+revocation is the defensible choice.</p>
+<p><strong>Recipient notification method.</strong> Notification was made
+by voice rather than email deliberately. If the mailbox is under
+attacker observation, an emailed warning tips off the actor and may
+itself be intercepted by the rule under investigation.</p>
+<hr />
+<h2 id="6-root-cause">6. Root Cause</h2>
+<p>The proximate cause is unremediated mailbox access from
+INC-ICS-2026-0716-001. The BEC email is the symptom. The identity
+compromise is the cause, and remediation that addresses only the
+fraudulent email leaves the underlying access intact.</p>
+<p>Contributing factors that allowed the activity to proceed undetected
+by technical controls:</p>
+<ul>
+<li><strong>No detection on inbox rule creation.</strong> A rule
+combining financial keywords with a hide or delete action was created
+with no alert raised.</li>
+<li><strong>Email authentication provides no protection in this attack
+class.</strong> SPF, DKIM, and DMARC all pass, because the message is
+genuinely sent from the legitimate mailbox on the legitimate domain.
+Authentication success is not evidence of legitimacy where the account
+itself is compromised.</li>
+<li><strong>No behavioural baseline on sending patterns.</strong> There
+was no control evaluating whether a financial change request to an
+internal recipient deviated from the user's normal communication
+pattern.</li>
+<li><strong>No payment verification process control.</strong> In a
+production environment, the fraud depends on the recipient acting on
+emailed banking details without out of band confirmation.</li>
+</ul>
+<hr />
+<h2 id="7-recommendations">7. Recommendations</h2>
+<table>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>Control</th>
+<th>What it addresses</th>
+<th>Cost</th>
+<th>Priority</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td><strong>Out of band payment verification procedure.</strong>
+Mandatory voice confirmation to a previously known number for any change
+to banking details, regardless of source</td>
+<td>Breaks the fraud at the point of execution. This is the single
+control that defeats BEC irrespective of technical detection</td>
+<td>Process only, no licensing</td>
+<td>High</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td><strong>Alert on inbox rule creation with financial keywords plus
+hide or delete action</strong></td>
+<td>Detects the persistence stage. Rule parameters
+(<code>SubjectContainsWords</code>, <code>MoveToFolder</code>,
+<code>DeleteMessage</code>) are available in <code>OfficeActivity</code>
+and are directly queryable</td>
+<td>$0, analytics rule</td>
+<td>High</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td><strong>Restrict or alert on external mail forwarding
+rules</strong></td>
+<td>Closes the exfiltration variant of the same technique, not used in
+this exercise but standard in real BEC</td>
+<td>$0, Exchange transport policy</td>
+<td>High</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td><strong>External email tagging</strong></td>
+<td>Reduces the effectiveness of spoofed sender variants of BEC by
+making external origin visually explicit</td>
+<td>$0, included in Exchange Online</td>
+<td>Medium</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td><strong>Behavioural detection on anomalous send patterns</strong>
+(financial vocabulary, unusual recipients, deviation from user
+baseline)</td>
+<td>Detects the fraud execution stage where no infrastructure indicator
+exists</td>
+<td>$0, analytics rule or UEBA</td>
+<td>Medium</td>
+</tr>
+<tr class="even">
+<td>6</td>
+<td><strong>Resolve the underlying identity compromise</strong> (token
+protection, risk based Conditional Access), per INC-ICS-2026-0716-001
+Section 7</td>
+<td>Removes the access that makes BEC possible</td>
+<td>$0, included in E5</td>
+<td>High</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="8-appendices">8. Appendices</h2>
+<h3 id="81-indicators-and-artefacts">8.1 Indicators and artefacts</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Artefact</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Malicious inbox rule</td>
+<td><code>SS Sync</code></td>
+</tr>
+<tr class="even">
+<td>Rule conditions</td>
+<td><code>SubjectOrBodyContainsWords: invoice</code>,
+<code>SubjectContainsWords: payment</code></td>
+</tr>
+<tr class="odd">
+<td>Rule action</td>
+<td><code>MoveToFolder: Deleted Items</code>,
+<code>StopProcessingRules: True</code></td>
+</tr>
+<tr class="even">
+<td>Fraudulent subject</td>
+<td><code>Updated banking details, Invoice INV-4417</code></td>
+</tr>
+<tr class="odd">
+<td>InternetMessageId</td>
+<td><code>&lt;YTZP288MB119107CC272E0F83959A9977FFC52@YTZP288MB1191.CANP288.PROD.OUTLOOK.COM&gt;</code></td>
+</tr>
+<tr class="even">
+<td>Source IP, all events</td>
+<td><code>142.198.143.161</code> (user's normal residential IP, not an
+indicator of compromise)</td>
+</tr>
+<tr class="odd">
+<td>Client</td>
+<td><code>Client=OWA</code>, Mac Chrome, normal user agent</td>
+</tr>
+<tr class="even">
+<td>Claimed fraud amount</td>
+<td>$47,000</td>
+</tr>
+</tbody>
+</table>
+<h3
+id="82-social-engineering-markers-present-in-the-fraudulent-message">8.2
+Social engineering markers present in the fraudulent message</h3>
+<ul>
+<li>Urgency, payment described as due "this week" with confirmation
+requested "today".</li>
+<li>Pre emptive unavailability, sender states they are "in meetings",
+discouraging voice verification.</li>
+<li>Minimal change request, only the banking details differ from a
+transaction the recipient already expects to process.</li>
+<li>Plausible specificity, named invoice reference and amount.</li>
+</ul>
+<h3 id="83-data-sources-used">8.3 Data sources used</h3>
+<p><code>OfficeActivity</code> for <code>New-InboxRule</code>,
+<code>Send</code>, <code>MoveToDeletedItems</code>, and
+<code>SoftDelete</code>. <code>AuditLogs</code> for identity actions.
+<code>CloudAppEvents</code> is empty in this tenant, so
+<code>OfficeActivity</code> was used throughout, consistent with the
+finding recorded in INC-ICS-2026-0716-001.</p>
+<h3 id="84-limitations-lab-boundaries">8.4 Limitations (lab
+boundaries)</h3>
+<p>This exercise reproduced the detectable mechanics of BEC, not its
+financial or multi party dimensions. Excluded honestly from
+findings:</p>
+<ul>
+<li><strong>No genuine thread hijacking.</strong> There was no real
+multi message vendor thread to insert into. The fraudulent email was an
+original send, not a reply within an existing conversation, so Stage 4
+is only partially represented.</li>
+<li><strong>No external vendor or real invoice.</strong> All activity
+was internal to the tenant, with a fabricated invoice reference.</li>
+<li><strong>No payment, no financial impact, no recovery
+window.</strong> Stage 5 of the kill chain occurs outside M365 and could
+not be reproduced. Bank recall and law enforcement coordination are
+therefore untested.</li>
+<li><strong>No reconnaissance phase in this incident.</strong> Mailbox
+reading was carried out during INC-ICS-2026-0716-001 and was not
+repeated here.</li>
+<li><strong>Response timestamps are analyst recorded</strong> to the
+minute, whereas footprint timestamps are taken from audit records and
+are exact.</li>
+</ul>
+<h3 id="85-relationship-to-inc-ics-2026-0716-001">8.5 Relationship to
+INC-ICS-2026-0716-001</h3>
+<table>
+<thead>
+<tr class="header">
+<th></th>
+<th>INC-ICS-2026-0716-001 (AiTM)</th>
+<th>INC-ICS-2026-0718-002 (BEC)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Kill chain position</td>
+<td>Initial access</td>
+<td>Objective</td>
+</tr>
+<tr class="even">
+<td>Primary signal</td>
+<td>Infrastructure, anonymised IPs, risky sign in</td>
+<td>Behaviour, event sequence and timing</td>
+</tr>
+<tr class="odd">
+<td>Detection pivot</td>
+<td>Attacker IP address</td>
+<td>Rule parameters, send content, temporal proximity</td>
+</tr>
+<tr class="even">
+<td>Source IP character</td>
+<td>Tor exit nodes, four countries</td>
+<td>User's own residential IP</td>
+</tr>
+<tr class="odd">
+<td>Primary impact</td>
+<td>Data access</td>
+<td>Attempted financial fraud</td>
+</tr>
+<tr class="even">
+<td>Response order</td>
+<td>Contain, then eradicate</td>
+<td>Preserve, notify, eradicate, then contain</td>
+</tr>
+</tbody>
+</table>
+<p>Together these two incidents represent one actor's progression from
+credential compromise to attempted financial fraud, and demonstrate that
+the two stages require fundamentally different detection strategies.</p>
+<hr />
+<p><em>Prepared as a SOC investigation exercise. Methodology: preserve,
+scope, assess, notify, eradicate, contain. Report structure adapted from
+the Ridgeline Module 13 BEC IR template. All evidence self generated and
+verified against audit records.</em></p>
+
+</article>
+<footer class="sitefoot">Adewale Odeja &middot; SOC Analyst (Tier 1/2) &middot; Microsoft Sentinel &amp; Defender &middot; SC-200 &middot; <a href="https://www.linkedin.com/in/adewaleodeja/">LinkedIn</a></footer>
+</div>
+</body>
+</html>

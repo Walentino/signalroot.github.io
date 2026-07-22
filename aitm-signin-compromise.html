@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adversary-in-the-Middle Sign-In Compromise — Adewale Odeja</title>
+<meta name="description" content="Anomalous authenticated access from anonymised Tor infrastructure across four countries, with a mail-hiding inbox rule and mailbox reads. Correlated a">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+<nav class="report-nav"><a href="index.html">&larr; All case files</a></nav>
+<article class="report">
+<h1
+id="incident-investigation-report--aitm-credential-phishing-simulation">Incident
+Investigation Report — AiTM Credential-Phishing Simulation</h1>
+<p><strong>Incident ID:</strong> INC-ICS-2026-0716-001
+<strong>Classification:</strong> Controlled detection-validation
+exercise (lab, self-generated telemetry — not a real breach)
+<strong>Attack type:</strong> Adversary-in-the-Middle (AiTM) —
+post-compromise segment <strong>Environment:</strong> iCustomerSolutions
+M365 E5 tenant · Microsoft Sentinel workspace
+<code>law-sentinel-lab</code> · Defender XDR unified portal
+<strong>Affected account:</strong>
+<code>dave@iCustomerSolutions.onmicrosoft.com</code> (single test
+account) <strong>Investigation date:</strong> 16 July 2026
+<strong>Status:</strong> Closed — contained and eradicated; detection
+methodology validated <strong>Times:</strong> UTC throughout (source
+events captured in ET; ET + 4h)</p>
+<hr />
+<h2 id="1-executive-summary">1. Executive Summary</h2>
+<p>On 16 July 2026, a controlled adversary-in-the-middle (AiTM)
+detection-validation exercise was performed against a single test
+account in the iCustomerSolutions M365 E5 tenant. The simulated
+adversary authenticated successfully from anonymized Tor infrastructure
+across four countries, with Entra ID Protection flagging the sign-ins as
+risky ("anonymous IP address") while Conditional Access did not evaluate
+them (<code>notApplied</code>). From a German Tor exit the actor read
+two mailbox items via proxy and created a mail-hiding inbox rule
+("system") for persistence. The account was contained by 15:53 UTC
+through full session and refresh-token revocation, and the persistence
+rule was eradicated by 16:15 UTC, with mailbox forwarding, MFA-method
+registration, OAuth consent, and device registration all verified
+absent. No real data was exposed. The exercise validated the AiTM
+detection and investigation methodology end to end and surfaced a tenant
+telemetry gap (empty <code>CloudAppEvents</code>;
+<code>OfficeActivity</code> used as the working source). Hardening
+recommendations are in Section 7.</p>
+<hr />
+<h2 id="2-timeline">2. Timeline</h2>
+<p>All times UTC, 16 July 2026 unless stated. Surrounding-context
+activity from 15 July is summarised in Section 8.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Time (UTC)</th>
+<th>Event</th>
+<th>Source</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>14:36:49</td>
+<td>Mailbox item read via proxy (<code>MailItemsAccessed</code>,
+<code>Client=OWA;Action=ViaProxy</code>) — first adversary-attributable
+read</td>
+<td>OfficeActivity</td>
+<td>Noted as data-access evidence</td>
+</tr>
+<tr class="even">
+<td>14:57:08</td>
+<td>Second mailbox item read via proxy</td>
+<td>OfficeActivity</td>
+<td>Noted as data-access evidence</td>
+</tr>
+<tr class="odd">
+<td>14:57:39 → 15:05</td>
+<td>Sustained risky sign-in session from German Tor exit
+<code>2a0a:4cc0:c1:a200:e84c:bbff:fe4e:b79c</code> (risk: medium;
+<code>ConditionalAccessStatus = notApplied</code>)</td>
+<td>SigninLogs</td>
+<td>Confirmed anomalous authenticated access</td>
+</tr>
+<tr class="even">
+<td>15:03:47</td>
+<td>Inbox rule <strong>"system"</strong> created
+(<code>New-InboxRule</code>, <code>MoveToFolder</code> action) from
+<code>[2a0a:4cc0:c1:a200:e84c:bbff:fe4e:b79c]:37348</code></td>
+<td>OfficeActivity</td>
+<td>Persistence identified</td>
+</tr>
+<tr class="odd">
+<td>15:53</td>
+<td><strong>Containment:</strong> all refresh tokens / active sessions
+revoked for <code>dave</code></td>
+<td>Entra ID / manual</td>
+<td>Access terminated</td>
+</tr>
+<tr class="even">
+<td>16:15</td>
+<td><strong>Eradication:</strong> inbox rule "system" removed; Rules
+list verified empty</td>
+<td>Exchange Online / manual</td>
+<td>Persistence removed</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Correlation basis:</strong> the sign-in and inbox-rule events
+were tied together by shared source IP (<code>2a0a:4cc0:…:b79c</code>,
+bracket-and-port formatting reconciled) within a tight time window. The
+two proxy mailbox reads were tied by time proximity and the
+<code>Action=ViaProxy</code> client signal, as
+<code>MailItemsAccessed</code> does not record a usable source IP.</p>
+<hr />
+<h2 id="3-scope">3. Scope</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Attribute</th>
+<th>Finding</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Accounts targeted</td>
+<td>1 (<code>dave</code>)</td>
+</tr>
+<tr class="even">
+<td>Accounts compromised</td>
+<td>1</td>
+</tr>
+<tr class="odd">
+<td>Blast radius</td>
+<td>Single account — confirmed by IP-pivot across
+<code>SigninLogs</code> (attacker IP resolved to no other account)</td>
+</tr>
+<tr class="even">
+<td>Persistence mechanisms</td>
+<td>1 — inbox rule "system" (move-to-folder)</td>
+</tr>
+<tr class="odd">
+<td>Mailbox items read (adversary-attributable)</td>
+<td>2 (both <code>ViaProxy</code>)</td>
+</tr>
+<tr class="even">
+<td>Data sensitivity exposed</td>
+<td>None — lab mailbox, no real PII/financial content</td>
+</tr>
+<tr class="odd">
+<td>Non-interactive token activity</td>
+<td>None observed</td>
+</tr>
+</tbody>
+</table>
+<p>Reads recorded from <code>Client=REST;RESTSystem</code> (background
+service) and from plain browser user-agents (normal use) were reviewed
+and <strong>excluded</strong> from adversary attribution. Only the two
+<code>ViaProxy</code> reads are counted.</p>
+<hr />
+<h2 id="4-containment-actions">4. Containment Actions</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Action</th>
+<th>Time (UTC)</th>
+<th>Executed by</th>
+<th>Verification</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Revoke all refresh tokens / sessions for <code>dave</code></td>
+<td>15:53</td>
+<td>Analyst (admin)</td>
+<td>Post-revocation <code>SigninLogs</code> check for attacker IP
+returned no new successful sign-ins</td>
+</tr>
+<tr class="even">
+<td>Block attacker IP via Conditional Access</td>
+<td>—</td>
+<td>—</td>
+<td><strong>Assessed and rejected.</strong> Source was rotating Tor exit
+nodes (four countries); single-IP block is ineffective. Correct control
+is a risk-based / anonymous-IP CA policy — see Section 7.</td>
+</tr>
+<tr class="odd">
+<td>Disable account</td>
+<td>—</td>
+<td>—</td>
+<td><strong>Assessed and rejected.</strong> Course criteria (MFA method
+registered, OAuth consent, ongoing internal phishing) were all verified
+absent; token revocation was sufficient.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Containment rationale (order):</strong> token/session
+revocation was performed first because the AiTM-relevant artifact is a
+session token, not a password. Password reset alone would not terminate
+an active stolen session. Containment was achieved with minimal
+disruption (revocation only).</p>
+<hr />
+<h2 id="5-eradication-actions">5. Eradication Actions</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Persistence vector</th>
+<th>Result</th>
+<th>Verification</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Inbox rule "system"</td>
+<td>Removed at 16:15 UTC</td>
+<td>Rules list re-checked — empty</td>
+</tr>
+<tr class="even">
+<td>Mailbox-level forwarding (<code>Set-Mailbox</code>)</td>
+<td>None present</td>
+<td>OfficeActivity check — no forwarding events</td>
+</tr>
+<tr class="odd">
+<td>Attacker MFA method registration</td>
+<td>None present</td>
+<td>AuditLogs check — no security-info registration for
+<code>dave</code></td>
+</tr>
+<tr class="even">
+<td>OAuth application consent</td>
+<td>None present</td>
+<td>AuditLogs check — no "Consent to application" for
+<code>dave</code></td>
+</tr>
+<tr class="odd">
+<td>Device registration</td>
+<td>None present</td>
+<td>AuditLogs check — no "Register device" for <code>dave</code></td>
+</tr>
+</tbody>
+</table>
+<p>Eradication is assessed <strong>complete</strong>: the single
+persistence mechanism was removed and every other vector was verified
+clean by query rather than assumed. Because no MFA method, OAuth
+consent, or device registration existed, no persistence survives token
+revocation.</p>
+<hr />
+<h2 id="6-root-cause">6. Root Cause</h2>
+<p>In this exercise the anomalous, risky sign-ins succeeded and were
+<strong>not challenged</strong> because no Conditional Access policy was
+scoped to the account — every risky sign-in recorded
+<code>ConditionalAccessStatus = notApplied</code>, meaning no policy
+evaluated the request. Contributing factors mirror the general AiTM root
+cause: no token binding (Conditional Access token protection) was
+configured, and no phishing-resistant (FIDO2) authentication was
+enforced, so an authenticated session from anonymized infrastructure
+faced no additional control.</p>
+<p><strong>Note on <code>notApplied</code>:</strong> in a production
+tenant, <code>notApplied</code> on a risky sign-in is itself a finding —
+it means no policy ran and warrants investigation. Here the cause is
+simply an unscoped policy set in a lab, not evidence of token replay.
+This report does <strong>not</strong> claim token replay: the evidence
+shows anomalous authenticated access from anonymizer infrastructure, not
+a captured legitimate-then-replayed session pair.</p>
+<hr />
+<h2 id="7-recommendations">7. Recommendations</h2>
+<table>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>Control</th>
+<th>What it prevents</th>
+<th>Cost</th>
+<th>Priority</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td><strong>Conditional Access token protection (token
+binding)</strong></td>
+<td>Binds the session token to the originating device; a token used from
+a different device is rejected. The definitive AiTM preventive
+control.</td>
+<td>$0 (included in E5); ~hours of config</td>
+<td>High</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td><strong>Risk-based Conditional Access policy</strong> (block or
+require reauth on medium/high sign-in risk; block anonymous-IP
+sign-ins)</td>
+<td>Directly addresses the <code>notApplied</code> gap found here —
+anonymous-IP / risky sign-ins would be challenged or blocked.</td>
+<td>$0 (E5 / Entra ID P2)</td>
+<td>High</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td><strong>FIDO2 phishing-resistant MFA</strong></td>
+<td>The credential is bound to the legitimate domain; an AiTM proxy on a
+look-alike domain cannot satisfy the challenge.</td>
+<td>Hardware/platform keys; rollout effort</td>
+<td>Medium</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td><strong>Continuous Access Evaluation (CAE) with strict
+enforcement</strong></td>
+<td>Near-real-time token revocation on risk events (IP/location change,
+disable), shrinking the window a stolen token stays usable.</td>
+<td>$0 (E5)</td>
+<td>Medium</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td><strong>Inbox-rule / mail-flow monitoring</strong></td>
+<td>Detection for <code>New-InboxRule</code> with move-to-hidden-folder
+or delete actions on finance/security keywords — the persistence pattern
+seen here.</td>
+<td>$0 (analytics rule)</td>
+<td>Medium</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="8-appendices">8. Appendices</h2>
+<h3 id="81-indicators-of-compromise-iocs">8.1 Indicators of Compromise
+(IOCs)</h3>
+<p>Anonymized-infrastructure sign-in sources (all classified by Entra ID
+Protection as <strong>anonymous IP address</strong> — Tor exit
+nodes):</p>
+<table>
+<thead>
+<tr class="header">
+<th>IP address</th>
+<th>Country</th>
+<th>Context</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>2a0a:4cc0:c1:a200:e84c:bbff:fe4e:b79c</code></td>
+<td>DE</td>
+<td><strong>Case IP</strong> — inbox rule + concurrent risky sign-ins
+(16 Jul)</td>
+</tr>
+<tr class="even">
+<td><code>2a0b:f4c2::2</code></td>
+<td>DE</td>
+<td>Interspersed in the 16 Jul session</td>
+</tr>
+<tr class="odd">
+<td><code>2001:67c:289c:4::78</code></td>
+<td>SE</td>
+<td>16 Jul morning session</td>
+</tr>
+<tr class="even">
+<td><code>2a0d:bbc7::f816:3eff:fe72:95b6</code></td>
+<td>SE</td>
+<td>15 Jul (setup/earlier sessions)</td>
+</tr>
+<tr class="odd">
+<td><code>2a0b:f4c2::19</code></td>
+<td>DE</td>
+<td>15 Jul</td>
+</tr>
+<tr class="even">
+<td><code>85.137.57.19</code></td>
+<td>ES</td>
+<td>15 Jul</td>
+</tr>
+</tbody>
+</table>
+<p>Persistence IOC: inbox rule <strong>"system"</strong> —
+<code>New-InboxRule</code>, <code>MoveToFolder</code> action — created
+15:03:47 UTC from
+<code>2a0a:4cc0:c1:a200:e84c:bbff:fe4e:b79c</code>.</p>
+<h3 id="82-surrounding-context-activity-15-july">8.2 Surrounding-context
+activity (15 July)</h3>
+<p>Risky sign-ins from SE, DE, and ES Tor exits between ~19:28 and
+~21:08 UTC on 15 July, plus an SE session ~13:30–13:42 UTC on 16 July,
+preceded the confirmed case session. These represent infrastructure
+rotation across the exercise and are treated as context, not part of the
+tightly-scoped incident.</p>
+<h3 id="83-data-sources-used">8.3 Data sources used</h3>
+<p><code>SigninLogs</code> (anomalous authentication, risk,
+<code>ConditionalAccessStatus</code>, <code>SessionId</code>),
+<code>OfficeActivity</code> (<code>New-InboxRule</code>,
+<code>MailItemsAccessed</code>), <code>AuditLogs</code> (MFA / OAuth /
+device-registration checks),
+<code>AADNonInteractiveUserSignInLogs</code> (token-use check).
+<code>SessionId</code> of the case sign-in:
+<code>006d219a-5c03-1309-3a06-675669b6aea1</code>.</p>
+<h3 id="84-limitations-lab-reality-boundaries">8.4 Limitations
+(lab-reality boundaries)</h3>
+<p>This exercise reproduced the <strong>post-compromise segment</strong>
+of an AiTM attack. The following were not present and are honestly
+excluded from findings:</p>
+<ul>
+<li><strong>No phishing lure / URL click.</strong> No real AiTM proxy
+was run; <code>EmailEvents</code> / <code>UrlClickEvents</code> carry no
+lure. The email-analysis and click-correlation steps were read-along
+only.</li>
+<li><strong>No token-replay pair.</strong> There is no
+legitimate-then-replayed sign-in sequence. Evidence is anomalous
+authenticated access from anonymizer IPs, not proven token replay.</li>
+<li><strong>No non-interactive token activity.</strong>
+<code>AADNonInteractiveUserSignInLogs</code> returned no attacker-IP
+rows — consistent with human interactive access via Tor, not scripted
+token abuse. A real case would show sustained Graph/EWS/OWA token calls
+here.</li>
+<li><strong>Single account, lab mailbox.</strong> No lateral spread, no
+waves, no real data exposure.</li>
+<li><strong>Telemetry gap surfaced.</strong> <code>CloudAppEvents</code>
+was empty in this tenant; post-compromise evidence was obtained from
+<code>OfficeActivity</code> after enabling the Microsoft 365
+connector.</li>
+</ul>
+<hr />
+<p><em>Prepared as a SOC investigation exercise. Methodology: detect →
+scope → assess → contain → eradicate. Report structure adapted from the
+Ridgeline Module 12 IR template; all evidence self-generated and
+verified.</em></p>
+
+</article>
+<footer class="sitefoot">Adewale Odeja &middot; SOC Analyst (Tier 1/2) &middot; Microsoft Sentinel &amp; Defender &middot; SC-200 &middot; <a href="https://www.linkedin.com/in/adewaleodeja/">LinkedIn</a></footer>
+</div>
+</body>
+</html>

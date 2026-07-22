@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token-Replay Control Assessment — Adewale Odeja</title>
+<meta name="description" content="Assessed CAE and Conditional Access token protection against tenant state. Identified a missing Conditional Access baseline as the root gap and re-pri">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+<nav class="report-nav"><a href="index.html">&larr; All case files</a></nav>
+<article class="report">
+<h1 id="token-security-control-assessment">Token Security Control
+Assessment</h1>
+<p><strong>Reference:</strong> TSA-ICS-2026-0721-003 <strong>Related
+incidents:</strong> INC-ICS-2026-0716-001 (AiTM credential phishing),
+INC-ICS-2026-0718-002 (BEC). Both reports recommended token protection
+and Continuous Access Evaluation. This assessment evaluates whether
+those controls are deployable and in what order. <strong>Type:</strong>
+Control gap assessment, not an incident investigation. See Section 6 for
+why. <strong>Environment:</strong> iCustomerSolutions M365 E5 tenant,
+Microsoft Sentinel workspace <code>law-sentinel-lab</code>
+<strong>Date:</strong> 21 July 2026</p>
+<hr />
+<h2 id="1-summary">1. Summary</h2>
+<p>Both prior incident reports recommended Conditional Access token
+protection and Continuous Access Evaluation as the controls that defeat
+token replay. This assessment tested whether either is deployable in the
+current tenant.</p>
+<p>Token protection is <strong>not deployable</strong>. It requires
+Entra joined or hybrid joined Windows devices with TPM 2.0, and is
+currently limited to Windows desktop applications. A device landscape
+query returned zero managed devices: all sign-ins originate from
+unmanaged macOS and unmanaged Windows endpoints with no device trust
+type recorded. The tenant is at 0% eligibility against a recommended
+threshold of 80%.</p>
+<p>CAE standard enforcement is <strong>already active</strong>, as it is
+enabled by default on E5. CAE strict location enforcement is
+<strong>deployable but currently ineffective</strong>, because strict
+mode evaluates client IP against Conditional Access location policies
+and named locations, and the tenant has neither. This is the same root
+cause identified in INC-ICS-2026-0716-001, where every risky sign-in
+recorded <code>ConditionalAccessStatus = notApplied</code> because no
+policy evaluated the request.</p>
+<p>The gap is therefore not a missing advanced control. It is a missing
+Conditional Access baseline. Recommended sequence is in Section 5.</p>
+<hr />
+<h2 id="2-why-token-controls-matter-mechanism">2. Why token controls
+matter, mechanism</h2>
+<p>Token replay bypasses MFA because MFA is an authentication control
+and replay is a session control attack. The attacker presents a token
+that already passed MFA, so no password check and no MFA challenge
+occurs. From the identity provider's perspective this is session
+continuation, not a new sign-in.</p>
+<p>Token types and their behaviour under containment:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Token</th>
+<th>Lifetime</th>
+<th>Revocable</th>
+<th>Survives password reset</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Access token</td>
+<td>60 to 90 minutes</td>
+<td>Not directly, expires naturally, CAE can force re-evaluation</td>
+<td>Yes, until expiry</td>
+</tr>
+<tr class="even">
+<td>Refresh token</td>
+<td>Up to 90 days, sliding window</td>
+<td>Yes, <code>Revoke-MgUserSignInSession</code></td>
+<td>Yes, until explicitly revoked</td>
+</tr>
+<tr class="odd">
+<td>Session cookie</td>
+<td>Session, or persistent up to 90 days</td>
+<td>Yes, session revocation</td>
+<td>Yes, until revoked</td>
+</tr>
+<tr class="even">
+<td>Primary Refresh Token</td>
+<td>Device registration lifetime</td>
+<td>Yes, device deregistration</td>
+<td>Yes, tied to device not password</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Operational consequence.</strong> Password reset alone does
+not contain a token-based compromise. The refresh token was issued
+before the password change and has an independent lifetime, so it
+continues to mint new access tokens. Containment requires password reset
+plus token revocation, and ideally CAE enforcement.</p>
+<p><strong>The revocation gap.</strong> Session revocation invalidates
+refresh tokens and session cookies, but access tokens already issued
+remain valid until natural expiry, up to 90 minutes, because the
+resource server validates the token signature locally and does not call
+back to the identity provider. CAE closes this gap by having CAE-aware
+resource servers subscribe to critical event notifications.</p>
+<hr />
+<h2 id="3-current-state-evidence">3. Current state, evidence</h2>
+<h3 id="31-device-landscape">3.1 Device landscape</h3>
+<p>Query: <code>SigninLogs</code> over 30 days, successful sign-ins,
+summarised by operating system, <code>isManaged</code>, and
+<code>trustType</code>.</p>
+<table>
+<thead>
+<tr class="header">
+<th>OS</th>
+<th>IsManaged</th>
+<th>TrustType</th>
+<th>Distinct users</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>macOS</td>
+<td>false</td>
+<td>(empty)</td>
+<td>5</td>
+</tr>
+<tr class="even">
+<td>Windows 10</td>
+<td>false</td>
+<td>(empty)</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<p>Every sign-in originates from an unmanaged device. No device reports
+an Entra joined or hybrid joined trust type. Managed device share:
+<strong>0%</strong>.</p>
+<h3 id="32-conditional-access-posture">3.2 Conditional Access
+posture</h3>
+<p>INC-ICS-2026-0716-001 established that all risky sign-ins recorded
+<code>ConditionalAccessStatus = notApplied</code>, meaning no
+Conditional Access policy was in scope to evaluate them. No named
+locations are defined. Entra ID Protection is generating risk detections
+correctly, medium risk on anonymous IP sign-ins, but no policy consumes
+those signals.</p>
+<h3 id="33-cae-posture">3.3 CAE posture</h3>
+<p>CAE standard enforcement is active by default under E5 licensing and
+was in effect during the containment action in INC-ICS-2026-0716-001.
+CAE strict location enforcement is not configured.</p>
+<hr />
+<h2 id="4-gap-analysis">4. Gap analysis</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Control</th>
+<th>Recommended state</th>
+<th>Current state</th>
+<th>Gap</th>
+<th>Deployable now</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Token revocation on compromise</td>
+<td>Executed as first containment action</td>
+<td>Executed correctly in both incidents</td>
+<td>None</td>
+<td>Yes, in use</td>
+</tr>
+<tr class="even">
+<td>CAE standard</td>
+<td>Enabled</td>
+<td>Enabled by default (E5)</td>
+<td>None</td>
+<td>Yes, active</td>
+</tr>
+<tr class="odd">
+<td>Named locations</td>
+<td>Corporate and known IP ranges defined</td>
+<td>None defined</td>
+<td>Complete</td>
+<td>Yes, prerequisite work</td>
+</tr>
+<tr class="even">
+<td>Risk-based Conditional Access policy</td>
+<td>Block or challenge on medium/high sign-in risk and anonymous IP</td>
+<td>No policy in scope, <code>notApplied</code> on all risky
+sign-ins</td>
+<td>Complete</td>
+<td>Yes, highest priority</td>
+</tr>
+<tr class="odd">
+<td>CAE strict location enforcement</td>
+<td>Enabled, with accurate named locations</td>
+<td>Not configured, and would have limited effect without location
+policies</td>
+<td>Dependent on the two rows above</td>
+<td>Yes, but only after prerequisites</td>
+</tr>
+<tr class="even">
+<td>Token protection (token binding)</td>
+<td>Enforced for eligible devices</td>
+<td>0% eligible devices, all unmanaged, primary platform is macOS which
+is unsupported</td>
+<td>Complete, and blocked by platform</td>
+<td><strong>No</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="5-recommended-actions-in-sequence">5. Recommended actions, in
+sequence</h2>
+<p>Sequence matters. Deploying the advanced controls before the baseline
+delivers little protection.</p>
+<p><strong>1. Define named locations.</strong> Register known and
+corporate IP ranges in Entra ID. Prerequisite for any location-aware
+policy and for CAE strict enforcement to have anything to evaluate
+against. Cost $0.</p>
+<p><strong>2. Create a break-glass emergency access account and exclude
+it from all Conditional Access policies.</strong> Standard practice
+before any CA deployment. Critical in a single-administrator tenant,
+where a misconfigured policy can cause complete lockout with no second
+account available to remediate. Cost $0.</p>
+<p><strong>3. Deploy a risk-based Conditional Access policy in
+report-only mode.</strong> Block or require reauthentication on medium
+and high sign-in risk, and on anonymous IP address sign-ins. This
+directly addresses the <code>notApplied</code> finding from
+INC-ICS-2026-0716-001: the Tor sign-ins would have been challenged
+rather than silently permitted. Run report-only, review the what-if
+results, then enforce. Cost $0, included in Entra ID P2.</p>
+<p><strong>4. Enable CAE strict location enforcement.</strong> Only
+meaningful once steps 1 and 3 are in place. Reduces the revocation gap
+and rejects tokens presented from locations the policy does not permit.
+Deploy report-only first. Cost $0.</p>
+<p><strong>5. Token protection, deferred.</strong> Not deployable in the
+current environment. Revisit only if the estate moves to Entra joined
+Windows devices with TPM 2.0. Note that the control is limited to
+Windows desktop applications and does not currently cover macOS, mobile,
+or browser sessions, so it would not have protected the browser-based
+activity observed in either prior incident even with managed
+devices.</p>
+<p><strong>Interim compensating control.</strong> Until token protection
+becomes viable, CAE strict enforcement plus risk-based Conditional
+Access is the primary defence against token replay. For BYOD-heavy or
+non-Windows estates this is the standard fallback position, not a
+workaround.</p>
+<hr />
+<h2 id="6-scope-and-limitations">6. Scope and limitations</h2>
+<p>This assessment is deliberately not an incident investigation, and
+the reason is worth stating.</p>
+<p>Generating a genuine token replay artefact requires capturing a live
+session token and replaying it from separate infrastructure, which means
+operating a functioning adversary-in-the-middle proxy. That was ruled
+out at the start of this lab work as unsafe and unnecessary. Without it
+there is no authentic replay evidence to investigate.</p>
+<p>Two supporting findings confirm the boundary rather than working
+around it:</p>
+<ul>
+<li><code>AADNonInteractiveUserSignInLogs</code>, the primary evidence
+table for refresh token replay, returned no rows for the attacker IP
+during INC-ICS-2026-0716-001. The anonymised sign-ins in that incident
+were fresh authentications, not replays of a captured token.</li>
+<li>Consequently INC-ICS-2026-0716-001 does not claim token replay. It
+claims anomalous authenticated access from anonymiser infrastructure,
+which is what the evidence supports.</li>
+</ul>
+<p>Producing a fabricated token replay narrative would have been the
+alternative, and was rejected. An assessment that accurately reports
+what the environment can and cannot demonstrate is more defensible than
+an investigation of an event that did not occur.</p>
+<p><strong>Additional limitations.</strong> The device landscape sample
+covers a small lab tenant, so the 0% managed figure reflects the lab
+rather than a production estate. The blast radius assessments that would
+normally precede a Conditional Access deployment, such as measuring how
+many users legitimately sign in from three or more IP addresses, are not
+statistically meaningful at this scale. The methodology of measuring
+blast radius before enforcing is the transferable practice.</p>
+<hr />
+<h2 id="7-corrections-applied-to-prior-reports">7. Corrections applied
+to prior reports</h2>
+<p>This assessment refines two points in the earlier incident
+reports.</p>
+<p><strong>Containment completeness, INC-ICS-2026-0716-001.</strong>
+Session revocation was performed at 15:53 UTC and was proportionate
+given that no MFA registration, OAuth consent, or device registration
+existed. However, access tokens issued before revocation remained valid
+until natural expiry, leaving a theoretical window of up to 90 minutes.
+Disabling the account would have triggered CAE re-evaluation and closed
+that window immediately. The decision to revoke without disabling
+optimised for minimal disruption; disabling optimises for speed of
+containment. Both are defensible, and the choice depends on confidence
+that the actor is no longer active.</p>
+<p><strong>Recommendation precision, both reports.</strong> Both reports
+listed token protection as a high priority control. Following this
+assessment, that recommendation is downgraded to deferred and
+platform-blocked, and risk-based Conditional Access is elevated to first
+priority, since it is deployable today and directly addresses the
+observed <code>notApplied</code> root cause.</p>
+<hr />
+<p><em>Prepared as a SOC control assessment. Evidence drawn from
+<code>SigninLogs</code> device telemetry and the findings of
+INC-ICS-2026-0716-001 and INC-ICS-2026-0718-002.</em></p>
+
+</article>
+<footer class="sitefoot">Adewale Odeja &middot; SOC Analyst (Tier 1/2) &middot; Microsoft Sentinel &amp; Defender &middot; SC-200 &middot; <a href="https://www.linkedin.com/in/adewaleodeja/">LinkedIn</a></footer>
+</div>
+</body>
+</html>

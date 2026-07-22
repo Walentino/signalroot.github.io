@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Illicit OAuth Consent Grant — Adewale Odeja</title>
+<meta name="description" content="Consent-phishing grant investigated through AuditLogs. Identified tenant-wide (AllPrincipals) blast radius across three consent audit operations; erad">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+<nav class="report-nav"><a href="index.html">&larr; All case files</a></nav>
+<article class="report">
+<h1
+id="incident-investigation-report-illicit-oauth-consent-grant-simulation">Incident
+Investigation Report, Illicit OAuth Consent Grant Simulation</h1>
+<p><strong>Incident ID:</strong> INC-ICS-2026-0721-004 <strong>Related
+incidents:</strong> INC-ICS-2026-0716-001 (AiTM), INC-ICS-2026-0718-002
+(BEC), TSA-ICS-2026-0721-003 (token control assessment). Both prior
+investigations checked for OAuth consent persistence and confirmed none
+existed. This exercise creates and investigates the mechanism those
+checks were looking for. <strong>Classification:</strong> Controlled
+detection-validation exercise (lab, self-generated telemetry, not a real
+breach) <strong>Attack type:</strong> Consent phishing / illicit OAuth
+grant <strong>MITRE:</strong> T1550.001 (Application Access Token),
+T1098.003 (Additional Cloud Credentials) <strong>Environment:</strong>
+iCustomerSolutions M365 E5 tenant, Microsoft Sentinel workspace
+<code>law-sentinel-lab</code> <strong>Application:</strong>
+<code>M365 Document Verificatio</code>, client ID
+<code>e175816b-1d17-44f9-ab83-daea5fd1f7c2</code>, service principal
+<code>add4272e-64bd-4fab-8337-30e7518e2193</code> <strong>Date:</strong>
+21 July 2026 <strong>Status:</strong> Closed. Grant revoked, service
+principal removed. <strong>Times:</strong> UTC throughout (captured in
+ET, ET + 4h)</p>
+<hr />
+<h2 id="1-executive-summary">1. Executive Summary</h2>
+<p>On 21 July 2026 a controlled consent-phishing exercise was performed
+to generate and investigate an illicit OAuth grant, the persistence
+mechanism that survives password reset, token revocation, and MFA
+re-registration. An application named to appear legitimate was
+registered and configured to request <code>Mail.Read</code>. An initial
+attempt to obtain consent from a standard user was <strong>blocked by
+the tenant's user consent policy</strong>, which routed the request to
+administrator approval. The policy was then deliberately relaxed and
+consent was granted at administrator level, producing a grant with
+<code>ConsentType: AllPrincipals</code>, meaning the application was
+pre-authorised for every user in the tenant rather than a single
+mailbox. The grant was revoked and the service principal deleted within
+22 minutes. No data was accessed, as the application had no code and
+made no API calls. The exercise produced two findings of operational
+value: the tenant's default consent controls worked as designed and are
+the most effective preventive control available, and a single consent
+action generates three distinct audit operations, only one of which
+carries the permission detail that determines blast radius.</p>
+<hr />
+<h2 id="2-timeline">2. Timeline</h2>
+<p>All times 21 July 2026, taken from <code>AuditLogs</code>
+records.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Time (UTC)</th>
+<th>Event</th>
+<th>Operation</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>19:52:03</td>
+<td>Application registered and service principal created</td>
+<td><code>Add application</code>, <code>Add service principal</code>,
+<code>Create application</code></td>
+<td>AuditLogs</td>
+</tr>
+<tr class="even">
+<td>19:54:28</td>
+<td><code>Mail.Read</code> delegated permission added to the
+registration</td>
+<td><code>Update application</code>,
+<code>Update service principal</code></td>
+<td>AuditLogs</td>
+</tr>
+<tr class="odd">
+<td>~19:56</td>
+<td><strong>Standard user consent attempt blocked.</strong> Consent
+prompt returned "Need admin approval" for <code>dave</code></td>
+<td>Preventive control, no grant event generated</td>
+<td>Observed</td>
+</tr>
+<tr class="even">
+<td>20:00:18</td>
+<td>Tenant user consent policy changed</td>
+<td><code>Update authorization policy</code>, <code>Update role</code>,
+<code>Add role from template</code></td>
+<td>AuditLogs</td>
+</tr>
+<tr class="odd">
+<td>20:08:08</td>
+<td><strong>Consent granted at administrator level.</strong> Scope
+<code>Mail.Read User.Read</code>,
+<code>ConsentType: AllPrincipals</code>,
+<code>IsAdminConsent: True</code>, <code>IsAppOnly: False</code></td>
+<td><code>Consent to application</code>,
+<code>Add delegated permission grant</code>,
+<code>Add app role assignment grant to user</code></td>
+<td>AuditLogs</td>
+</tr>
+<tr class="even">
+<td>20:26:27</td>
+<td><strong>Eradication.</strong> Delegated permission grant
+removed</td>
+<td><code>Remove delegated permission grant</code></td>
+<td>AuditLogs</td>
+</tr>
+<tr class="odd">
+<td>20:30:40</td>
+<td><strong>Eradication.</strong> Enterprise application and service
+principal deleted</td>
+<td><code>Remove service principal</code></td>
+<td>AuditLogs</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Exposure window:</strong> 22 minutes 32 seconds from grant to
+full revocation.</p>
+<hr />
+<h2 id="3-scope-and-blast-radius">3. Scope and Blast Radius</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Attribute</th>
+<th>Finding</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Application</td>
+<td><code>M365 Document Verificatio</code> (unverified publisher,
+registered in-tenant)</td>
+</tr>
+<tr class="even">
+<td>Permissions granted</td>
+<td><code>Mail.Read</code>, <code>User.Read</code> (delegated)</td>
+</tr>
+<tr class="odd">
+<td>Consent type</td>
+<td><code>AllPrincipals</code></td>
+</tr>
+<tr class="even">
+<td>Admin consent</td>
+<td>Yes (<code>IsAdminConsent: True</code>)</td>
+</tr>
+<tr class="odd">
+<td>Application-only permissions</td>
+<td>No (<code>IsAppOnly: False</code>)</td>
+</tr>
+<tr class="even">
+<td>Users pre-authorised</td>
+<td>All tenant users</td>
+</tr>
+<tr class="odd">
+<td>Data actually accessed</td>
+<td>None, application had no code and made no Graph API calls</td>
+</tr>
+<tr class="even">
+<td>Source IP of consent</td>
+<td><code>142.198.143.161</code> (administrator's normal residential IP,
+not an indicator of compromise)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Note on <code>User.Read</code>.</strong> This scope is
+present by default in new app registrations and was not added
+deliberately. It should not be misread during investigation as an
+attacker-selected permission.</p>
+<hr />
+<h2 id="4-key-finding-allprincipals-is-a-third-permission-scope">4. Key
+Finding: <code>AllPrincipals</code> is a third permission scope</h2>
+<p>Standard guidance presents the OAuth permission model as a binary:
+delegated permissions are scoped to one consenting user, application
+permissions grant tenant-wide access and always require admin approval.
+The evidence from this exercise shows that framing is incomplete.</p>
+<p>The grant recorded here is <strong>delegated</strong>
+(<code>IsAppOnly: False</code>), which by the binary framing should mean
+single-user scope. But <code>DelegatedPermissionGrant.ConsentType</code>
+is <code>AllPrincipals</code>, which pre-authorises the application for
+every user in the tenant. No user will ever see a consent prompt for
+this application again. Any user who signs into it operates immediately
+with <code>Mail.Read</code> against their own mailbox.</p>
+<p>The accurate blast radius is therefore neither "one mailbox" nor
+"unconditional access to all mailboxes". It is <strong>any user who
+signs into the application, with no further prompting</strong>. This
+sits between the two categories the binary model describes.</p>
+<p><strong>Why the escalation occurred.</strong> Had the standard user
+consented directly, <code>ConsentType</code> would have recorded as
+<code>Principal</code> with that user's object ID, scoping the grant to
+a single mailbox. Because consent was granted at administrator level,
+the grant escalated to tenant-wide. This is the concrete mechanism
+behind the general warning that a compromised administrator account is
+the high-value target in consent phishing.</p>
+<p><strong>Investigative implication.</strong>
+<code>DelegatedPermissionGrant.ConsentType</code> must be read on every
+consent investigation. An analyst who confirms only that permissions
+were delegated, and stops there, will materially under-scope the
+incident.</p>
+<hr />
+<h2 id="5-second-finding-one-consent-action-three-audit-operations">5.
+Second Finding: one consent action, three audit operations</h2>
+<p>A single consent generated three separate operations at 20:08:08:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Operation</th>
+<th>Category</th>
+<th>Target</th>
+<th>Carries</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Consent to application</code></td>
+<td>ApplicationManagement</td>
+<td>The application</td>
+<td>Consent context: <code>IsAdminConsent</code>,
+<code>IsAppOnly</code>, <code>OnBehalfOfAll</code></td>
+</tr>
+<tr class="even">
+<td><code>Add delegated permission grant</code></td>
+<td>ApplicationManagement</td>
+<td>Microsoft Graph</td>
+<td><strong>Scope and <code>ConsentType</code></strong>, the
+blast-radius detail</td>
+</tr>
+<tr class="odd">
+<td><code>Add app role assignment grant to user</code></td>
+<td>UserManagement</td>
+<td>The application</td>
+<td>Assignment record</td>
+</tr>
+</tbody>
+</table>
+<p>Detection guidance commonly keys only on
+<code>Consent to application</code>. That operation confirms a consent
+occurred but does not carry the permission scope or the consent type.
+The operation that does, <code>Add delegated permission grant</code>,
+targets <strong>Microsoft Graph</strong> rather than the malicious
+application, so a rule filtering on suspicious application names would
+miss it entirely.</p>
+<p>A detection rule for illicit consent should therefore correlate both
+operations on timestamp and actor, rather than alerting on either
+alone.</p>
+<hr />
+<h2
+id="6-third-finding-preventive-control-operated-correctly-and-policy-weakening-is-itself-auditable">6.
+Third Finding: preventive control operated correctly, and policy
+weakening is itself auditable</h2>
+<p><strong>The default control worked.</strong> The initial consent
+attempt by a standard user was blocked. The tenant was configured with
+Microsoft-managed consent settings, under which user consent is
+permitted only for low-impact permissions from verified publishers or
+popular mail clients. <code>Mail.Read</code> for an unverified, newly
+registered application fell outside that scope, so Entra ID routed the
+request to administrator approval rather than presenting an accept
+prompt. No grant was created.</p>
+<p>This is the single most effective preventive control against consent
+phishing, because the consent prompt itself is genuine Microsoft UI and
+offers users no visual means of distinguishing a malicious application
+from a legitimate one. User training cannot close that gap; removing the
+ability to consent does.</p>
+<p><strong>Weakening the control is detectable.</strong> The policy
+change at 20:00:18 generated <code>Update authorization policy</code>
+alongside <code>Update role</code> and
+<code>Add role from template</code>, because consent settings are
+enforced through default user role permissions. In a real intrusion, an
+attacker who has compromised an administrator would need to weaken this
+policy before phishing users at scale. That preparatory step is
+auditable, and detecting it provides warning before any consent grant
+occurs.</p>
+<hr />
+<h2 id="7-containment-and-eradication">7. Containment and
+Eradication</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Order</th>
+<th>Action</th>
+<th>Time (UTC)</th>
+<th>Verification</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>Revoke delegated permission grant (<code>Mail.Read</code>)</td>
+<td>20:26:27</td>
+<td><code>Remove delegated permission grant</code> recorded</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>Delete enterprise application and service principal</td>
+<td>20:30:40</td>
+<td><code>Remove service principal</code> recorded</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>Restore tenant user consent policy</td>
+<td>Post-eradication</td>
+<td>Confirmed via portal state</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Why partial revocation is insufficient.</strong> After
+revoking <code>Mail.Read</code>, the application still existed with a
+live service principal and a residual <code>User.Read</code> grant.
+<code>User.Read</code> is low risk in isolation, but the application
+object remaining in the tenant is the actual exposure: an actor
+controlling that registration can request additional scopes, and users
+already covered by an <code>AllPrincipals</code> grant will not be
+prompted again for anything within it. Eradication of an illicit consent
+means removing the application, not reducing its permissions.</p>
+<p><strong>Why user token revocation is irrelevant here.</strong> No
+user session containment was performed, and none would have helped. A
+consented application authenticates using its own client credentials
+against its own grant, on a token chain entirely separate from any user
+session. This is why the standard containment sequence of password
+reset, token revocation, and MFA re-registration leaves consent-based
+persistence fully intact, and why both prior investigations in this
+series explicitly queried for consent grants before declaring
+containment complete.</p>
+<hr />
+<h2 id="8-recommendations">8. Recommendations</h2>
+<table>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>Control</th>
+<th>Addresses</th>
+<th>Cost</th>
+<th>Priority</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>Retain Microsoft-managed user consent settings, or "Do not allow
+user consent" with an admin consent workflow</td>
+<td>Prevents the attack at the consent step, the only reliable
+preventive control</td>
+<td>$0</td>
+<td>High</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>Alert on <code>Update authorization policy</code> events affecting
+consent settings</td>
+<td>Detects an attacker weakening the control before a consent
+campaign</td>
+<td>$0, analytics rule</td>
+<td>High</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>Detection rule correlating <code>Consent to application</code> with
+<code>Add delegated permission grant</code>, alerting on high-risk
+scopes (<code>Mail.*</code>, <code>Files.*</code>,
+<code>Directory.*</code>) <strong>and</strong> on
+<code>ConsentType: AllPrincipals</code> regardless of scope</td>
+<td>Detects the grant with accurate blast radius</td>
+<td>$0, analytics rule</td>
+<td>High</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td>Scheduled tenant-wide consent audit enumerating all existing grants,
+their scopes, consent types, and publisher verification status</td>
+<td>Finds pre-existing malicious or over-permissioned applications,
+which persist indefinitely with no expiry</td>
+<td>$0, periodic review</td>
+<td>Medium</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td>Admin consent request workflow with a documented permission review
+procedure</td>
+<td>Ensures administrator approval is a deliberate assessment rather
+than a routine click</td>
+<td>$0</td>
+<td>Medium</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="9-limitations-lab-boundaries">9. Limitations (lab
+boundaries)</h2>
+<ul>
+<li><strong>Admin consent, not user consent.</strong> The intended
+user-consent path was blocked by tenant policy, and a subsequent attempt
+via the authorisation URL failed with an endpoint error that was not
+resolved. Consent was therefore granted at administrator level. This
+changes the actor from a tricked end user to an administrator, and
+produced a tenant-wide <code>AllPrincipals</code> grant rather than a
+single-user <code>Principal</code> grant. The deviation is recorded
+rather than presented as a user-consent incident, and it produced the
+report's principal finding.</li>
+<li><strong>Policy weakening was performed by the analyst.</strong> The
+consent policy change at 20:00:18 was a deliberate exercise step, not
+adversary activity. It is included in the timeline because it mirrors a
+genuine attacker technique and demonstrates that the step is
+auditable.</li>
+<li><strong>No data access occurred, and none could be traced.</strong>
+The application consisted of a registration only, with no code and no
+client secret in use. It never called Microsoft Graph, so
+<code>AADServicePrincipalSignInLogs</code> would contain no activity and
+the "what did the application access" investigation stage could not be
+exercised. In a real incident this stage determines the data exposure
+scope and would be central to the report.</li>
+<li><strong>Application registered in the tenant under
+investigation.</strong> A genuine consent-phishing application is
+registered in an external tenant controlled by the attacker. Publisher
+verification and cross-tenant indicators, which are real investigative
+signals, are therefore absent here.</li>
+<li><strong>Single-tenant scale.</strong> Tenant-wide consent audit
+techniques were exercised against a tenant containing one application,
+so the technique is demonstrated but not stress-tested.</li>
+</ul>
+<hr />
+<h2 id="10-note-on-query-construction">10. Note on query
+construction</h2>
+<p>An initial search for the consent event using
+<code>where OperationName has "onsent"</code> returned no results
+despite the event being present. The <code>has</code> operator in KQL
+matches whole indexed terms rather than substrings, so a partial word
+never matches. <code>contains</code> performs substring matching, and
+<code>has "Consent"</code> would have matched correctly.</p>
+<p>The distinction has both correctness and performance consequences:
+<code>has</code> is term-indexed and efficient, <code>contains</code>
+scans and is slower. Using <code>has</code> with a partial term produces
+silent false negatives, which in an investigation is worse than an
+error, because an empty result reads as an absence of evidence.</p>
+<hr />
+<p><em>Prepared as a SOC investigation exercise. Methodology: generate,
+detect, scope, assess blast radius, eradicate, verify. Evidence drawn
+from <code>AuditLogs</code> and verified against portal state.</em></p>
+
+</article>
+<footer class="sitefoot">Adewale Odeja &middot; SOC Analyst (Tier 1/2) &middot; Microsoft Sentinel &amp; Defender &middot; SC-200 &middot; <a href="https://www.linkedin.com/in/adewaleodeja/">LinkedIn</a></footer>
+</div>
+</body>
+</html>
